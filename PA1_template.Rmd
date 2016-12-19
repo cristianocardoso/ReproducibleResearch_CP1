@@ -1,0 +1,89 @@
+---
+title: "Reproducible Research - Course Project 1 (Coursera - JHU)"
+output: html_document
+---
+
+### Introduction
+
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the "quantified self" movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+The data for this assignment can be downloaded from the course web site:
+
+Dataset: Activity monitoring data [52K]
+The variables included in this dataset are:
+
+steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+date: The date on which the measurement was taken in YYYY-MM-DD format
+interval: Identifier for the 5-minute interval in which measurement was taken
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+### Loading and prepocessing the data
+
+options(stringsAsFactors = FALSE)
+library(ggplot2)
+stepData <- read.csv("D:/RDados/Project1_ReproducibleResearch/activity.csv")
+
+stepData$date <- as.Date(stepData$date)
+
+### What is mean total number of steps taken per day?
+
+stepsPerDay <- with(stepData, tapply(steps, date, sum))
+
+ggplot(as.data.frame(stepsPerDay))+
+        geom_histogram(aes(stepsPerDay), fill = "green", col="navyblue", binwidth = 1000) + 
+        labs(title='Mean total number of steps taken per day')
+
+print(paste("Mean=", round(mean(stepsPerDay, na.rm = TRUE), 1)))
+print(paste("Median = ", round(median(stepsPerDay, na.rm = TRUE), 1)))
+
+### What is the average daily activity pattern?
+
+dailyPattern <- with(stepData, tapply(steps, interval, mean, na.rm = TRUE))
+dailyPattern <- data.frame(interval = as.integer(names(dailyPattern)), avgSteps = unname(dailyPattern))
+
+qplot(interval, avgSteps, data = dailyPattern, geom = "line") + 
+        labs(title = "Average daily activity pattern")
+        
+print(subset(dailyPattern, avgSteps == max(dailyPattern$avgSteps))$interval)
+
+### Imputing missing values
+
+sum(is.na(stepData$steps))
+
+missingData <- stepData[is.na(stepData$steps), ]
+
+missingData$steps <- dailyPattern$avgSteps[match(missingData$interval, dailyPattern$interval)]
+
+stepDataComplete <- rbind(stepData[!is.na(stepData$steps), ], missingData)
+
+stepsPerDay2 <- with(stepDataComplete, tapply(steps, date, sum, na.rm = TRUE))
+ggplot(as.data.frame(stepsPerDay2)) + 
+        geom_histogram(aes(stepsPerDay2), fill = "green", col = "navyblue", binwidth = 1000)+
+        labs(title='Mean total number of steps taken per day')
+
+print(paste("Mean =", round(mean(stepsPerDay2, na.rm = TRUE), 1)))
+print(paste("Median =", round(median(stepsPerDay2, na.rm = TRUE), 1)))
+print("The mean has not been altered, because the mean was used when imputing values. The median has been made equal to the mean, because one of the imputed days is now the median value.")
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+xNew$temp <- weekdays(as.Date(xNew$date))
+xNew$weekday <- factor(ifelse((xNew$temp) %in% c('Saturday','Sunday'),'Weekend','Weekday'))
+xNew$temp <- NULL
+
+stepDataComplete$weekday <- 
+        factor(ifelse(weekdays(stepDataComplete$date) %in% c('Saturday', 'Sunday'), 'Weekend', 'Weekday'))
+
+dailyPattern2 <- as.data.frame(with(stepDataComplete, tapply(steps, list(interval, weekday), 
+                                                             mean, na.rm = TRUE)))
+
+dailyPattern2 <- data.frame(
+        interval = as.numeric(rownames(dailyPattern2)),
+        weekday = c(rep("Weekday", length(dailyPattern2)), rep("Weekend", length(dailyPattern2))), 
+        avgSteps = as.numeric(c(dailyPattern2$Weekday, dailyPattern2$Weekend))
+)
+
+qplot(interval, avgSteps, data = dailyPattern2, geom = "line", facets = weekday ~ .) + 
+        labs(title='Weekdays x Weekends')
